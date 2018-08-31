@@ -11,6 +11,18 @@ from typing import Iterable, Tuple, List, Set, Callable
 class BaseTimeSeriesCrossValidator():
     """
     Abstract class for time series cross-validation.
+
+    Time series cross-validation requires each sample has a prediction time pred_time, at which the features are used to
+    predict the response, and an evaluation time eval_time, at which the response is known and the error can be
+    computed. Importantly, it means that unlike in standard sklearn cross-validation, the samples X, response y,
+    pred_times and eval_times must all be pandas dataframe/series having the same index. It is also assumed that the
+    samples are time-ordered with respect to the prediction time (i.e. pred_times is non-decreasing).
+
+    Parameters
+    ----------
+    n_splits : int, default=10
+        Number of folds. Must be at least 2.
+
     """
     def __init__(self, n_splits=10):
         if not isinstance(n_splits, numbers.Integral):
@@ -54,22 +66,15 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
 
     As described in Advances in financial machine learning, Marcos Lopez de Prado, 2018.
 
-    This cross-validation method is adapted to time-series data, where each sample has a prediction time, at which the
-    features are used to predict the response, and an evaluation time, at which the response is known and the error
-    can be computed. Importantly, it means that unlike in standard sklearn applications, the samples X, response y,
-    pred_times and eval_times must all be pandas dataframe having the same index. It is also assumed that the samples
-    are time-ordered with respect to the prediction time (i.e. pred_times is non-decreasing).
-
     The samples are decomposed into n_splits folds containing equal numbers of samples, without shuffling. In each cross
     validation round, n_test_splits folds are used as the test set, while the other folds are used as the train set.
     There are as many rounds as n_test_splits folds among the n_splits folds.
 
-    Each sample should be tagged with a prediction time and an evaluation time (gathered in the pandas series pred_times
-    and eval_times. The split is such that the intervals [pred_times, eval_times] associated to samples in the train and
-    test set do not overlap. (The overlapping samples are dropped.) In addition, an "embargo" fraction of the dataset
-    time span is defined, giving the minimal time between an evaluation time in the test set and a prediction time in
-    the training set. This is to avoid, in the presence of temporal correlation, a contamination of the test set by the
-    train set.
+    Each sample should be tagged with a prediction time pred_time and an evaluation time eval_time. The split is such
+    that the intervals [pred_times, eval_times] associated to samples in the train and test set do not overlap. (The
+    overlapping samples are dropped.) In addition, an "embargo" fraction of the dataset time span is defined, giving
+    the minimal time between an evaluation time in the test set and a prediction time in the training set. This is to
+    avoid, in the presence of temporal correlation, a contamination of the test set by the train set.
 
     Parameters
     ----------
