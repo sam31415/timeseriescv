@@ -48,27 +48,20 @@ class TestCombPurgedKFold(TestCase):
     - Test doesn't intersect train
     """
 
-    def setUp(self):
-        # Create artificial data
-        tm.K = 1
-        tm.N = 100
-        # Random data frame with an hourly index
-        test_df = tm.makeTimeDataFrame(freq='H')
-        # Turn the index into a column labeled 'index'
-        test_df = test_df.reset_index()
-        # Subtract and adds random time deltas to the index column, to create the prediction and evaluation times
-        rand_fact = tm.makeDataFrame().reset_index(drop=True).squeeze().iloc[:len(test_df)].abs()
-        test_df['index'] = test_df['index'].subtract(rand_fact.apply(lambda x: x * pd.Timedelta('4H')))
-        rand_fact = tm.makeDataFrame().reset_index(drop=True).squeeze().iloc[:len(test_df)].abs()
-        test_df['index2'] = test_df['index'].add(rand_fact.apply(lambda x: x * pd.Timedelta('4H')))
-        # Sort the data frame by prediction time
-        test_df = test_df.sort_values('index')
-        self.X = test_df['A']
-        self.pred_times = test_df['index']
-        self.exit_times = test_df['index2']
+    def test_compute_test_set(self):
+        """
+        We consider a sample set of size 10 with test folds [2:4], [4:6] and [8:10]. The function should return the
+        aggregated bounds [2:6], [8:10], as well as the corresponding test indices.
+        """
+        fold_bound_list = [(2, 4), (4, 6), (8, 10)]
+        result1 = [(2, 6), (8,10)]
+        result2 = np.array([2, 3, 4, 5, 8, 9])
 
-        # Create the cross-validation class with non-zero embargo
-        self.cv = CombPurgedKFold(n_splits=10, n_test_splits=2, embargo=0.02)
+        cv = CombPurgedKFold(n_splits=5)
+        prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
+        agg_fold_bound_list, test_indices = cv.compute_test_set(fold_bound_list)
+        self.assertEqual(result1, agg_fold_bound_list)
+        self.assertTrue(np.array_equal(result2, test_indices))
 
     def test_data_equal_indices(self):
         tm.assert_index_equal(self.X.index, self.pred_times.index)
@@ -155,7 +148,7 @@ class TestEmbargo(TestCase):
         test_fold_end = n
 
         prepare_cv_object(cv, n_samples=2 * n, time_shift='119m', randomlize_times=False)
-        cv.embargo_dt = 2/(2*n-1) * (cv.pred_times.max() - cv.pred_times.min())
+        cv.embargo_dt = 2 / (2 * n - 1) * (cv.pred_times.max() - cv.pred_times.min())
         train_indices = cv.indices[n:]
         test_indices = cv.indices[:n]
         result = cv.indices[n + 3:]
@@ -164,6 +157,7 @@ class TestEmbargo(TestCase):
         prepare_cv_object(cv, n_samples=2 * n, time_shift='120m', randomlize_times=False)
         result = cv.indices[n + 4:]
         self.assertTrue(np.array_equal(result, embargo(cv, train_indices, test_indices, test_fold_end)))
+
 
 if __name__ == '__main__':
     unittest.main()
