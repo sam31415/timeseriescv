@@ -60,6 +60,184 @@ class BaseTimeSeriesCrossValidator():
         self.indices = np.arange(X.shape[0])
 
 
+class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
+    """
+    Purged walk-forward cross-validation
+
+    As described in Advances in financial machine learning, Marcos Lopez de Prado, 2018.
+
+    The samples are decomposed into n_splits folds containing equal numbers of samples, without shuffling. In each cross
+    validation round, n_test_splits contiguous folds are used as the test set, while the train set consists in between
+    min_train_splits and max_train_splits immediately preceding folds.
+
+    Each sample should be tagged with a prediction time pred_time and an evaluation time eval_time. The split is such
+    that the intervals [pred_times, eval_times] associated to samples in the train and test set do not overlap. (The
+    overlapping samples are dropped.)
+
+    With split_by_times = True in the split method, it is also possible to split the samples in folds spanning equal
+    time intervals (using the prediction time as a time tag), instead of folds containing equal numbers of samples.
+
+    Parameters
+    ----------
+    n_splits : int, default=10
+        Number of folds. Must be at least 2.
+
+    n_test_splits : int, default = 1
+        Number of folds used in the test set. Must be at least 1.
+
+    min_train_splits: int, default = 2
+        Minimal number of folds to be used in the train set.
+
+    max_train_splits: int, default = None
+        Maximal number of folds to be used in the train set. If None, there is no upper limit.
+
+    """
+    def __init__(self, n_splits=10, n_test_splits=1, min_train_splits=2, max_train_splits=None):
+        super().__init__(n_splits)
+        if not isinstance(n_test_splits, numbers.Integral):
+            raise ValueError(f"The number of test folds must be of Integral type. {n_test_split} of type "
+                             f"{type(n_test_splits)} was passed.")
+        n_test_splits = int(n_test_splits)
+        if n_test_splits <= 0 or n_test_splits >= self.n_splits - 1:
+            raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
+                             f"n_test_splits between 1 and n_splits - 1, got n_test_splits = {n_test_splits}.")
+        self.n_test_splits = n_test_splits
+
+        if not isinstance(min_train_splits, numbers.Integral):
+            raise ValueError(f"The minimal number of train folds must be of Integral type. {min_train_splits} of type "
+                             f"{type(min_train_splits)} was passed.")
+        min_train_splits = int(min_train_splits)
+        if min_train_splits <= 0 or min_train_splits >= self.n_splits - self.n_test_splits:
+            raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
+                             f"min_train_splits between 1 and n_splits - n_test_splits, got min_train_splits = "
+                             f"{min_train_splits}.")
+        self.min_train_splits = min_train_splits
+
+        if max_train_splits is None:
+            max_train_splits = self.n_splits - self.n_test_splits
+        if not isinstance(max_train_splits, numbers.Integral):
+            raise ValueError(f"The maximal number of train folds must be of Integral type. {max_train_splits} of type "
+                             f"{type(max_train_splits)} was passed.")
+        max_train_splits = int(max_train_splits)
+        if max_train_splits <= 0 or max_train_splits >= self.n_splits - self.n_test_splits:
+            raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
+                             f"max_train_split between 1 and n_splits - n_test_splits, got max_train_split = "
+                             f"{max_train_splits}.")
+        self.max_train_splits = max_train_splits
+        self.fold_bounds = []
+
+    def split(self, X: pd.DataFrame, y: pd.Series = None, pred_times: pd.Series = None, eval_times: pd.Series = None,
+              split_by_time: bool = False) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Yield the indices of the train and test sets.
+
+        Although the samples are passed in the form of a pandas dataframe, the indices returned are position indices,
+        not labels.
+
+        Parameters
+        ----------
+        X : pd.DataFrame, shape (n_samples, n_features), required
+            Samples. Only used to extract n_samples.
+
+        y : pd.Series, not used, inherited from _BaseKFold
+
+        pred_times : pd.Series, shape (n_samples,), required
+            Times at which predictions are made. pred_times.index has to coincide with X.index.
+
+        eval_times : pd.Series, shape (n_samples,), required
+            Times at which the response becomes available and the error can be computed. eval_times.index has to
+            coincide with X.index.
+
+        split_by_time: bool
+            If False, the folds contain an (approximately) equal number of samples. If True, the folds span identical
+            time intervals.
+
+        Returns
+        -------
+        train_indices: np.ndarray
+            A numpy array containing all the indices in the train set.
+
+        test_indices : np.ndarray
+            A numpy array containing all the indices in the test set.
+
+        """
+        super().split(X, y, pred_times, eval_times)
+
+        # Fold boundaries
+        if split_by_time:
+            full_time_span = self.pred_times.max() - self.pred_times.min()
+            fold_time_span = full_time_span / self.n_splits
+            fold_bounds_times = [fold_time_span*n for n in range(n_splits)]
+            self.fold_bounds = self.pred_times.searchsorted(fold_bounds_times)
+        else:
+            self.fold_bounds = [fold[0] for fold in np.array_split(self.indices, self.n_splits)]
+
+        count_folds = 0
+        for fold_bound in self.fold_bounds:
+            if count_folds < self.min_train_splits:
+                continue
+            if self.n_splits - count_folds < self.n_test_splits:
+                break
+            # Computes the bounds of the test set, and the corresponding indices
+            test_indices = self.compute_test_set(fold_bound, count_folds)
+            # Computes the train set indices
+            train_indices = self.compute_train_set(fold_bound, count_folds)
+
+            count_folds += 1
+            yield train_indices, test_indices
+
+    def compute_train_set(self, fold_bound: int, count_folds: int) -> np.ndarray:
+        """
+        Compute the position indices of samples in the train set.
+
+        Parameters
+        ----------
+        fold_bound : int
+            Bound between the train set and the test set.
+
+        count_folds : int
+            The number (starting at 0) of the first fold in the test set.
+
+        Returns
+        -------
+        train_indices: np.ndarray
+            A numpy array containing all the indices in the train set.
+
+        """
+        if count_folds > self.max_train_splits:
+            start_train = self.fold_bounds[count_folds - self.max_train_splits]
+        else:
+            start_train = 0
+        train_indices = np.arange(start_train, fold_bound)
+        # Purge
+        train_indices = purge(self, train_indices, fold_bound, self.indices[-1])
+        return train_indices
+
+    def compute_test_set(self, fold_bound: int, count_folds: int) -> np.ndarray:
+        """
+        Compute the indices of the samples in the test set.
+
+        Parameters
+        ----------
+        fold_bound : int
+            Bound between the train set and the test set.
+
+        count_folds : int
+            The number (starting at 0) of the first fold in the test set.
+
+        Returns
+        -------
+        test_indices: np.ndarray
+            A numpy array containing the test indices.
+
+        """
+        if self.n_splits - count_folds > self.n_test_splits:
+            end_test = self.fold_bounds[count_folds + self.n_test_splits]
+        else:
+            end_test = self.indices[-1]
+        return np.arange(fold_bound, end_test)
+
+
 class CombPurgedKFold(BaseTimeSeriesCrossValidator):
     """
     Purged and embargoed combinatorial cross-validation
@@ -87,9 +265,6 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
     embargo : float, default=0.0
         Fraction of the sampling timespan that should be used as embargo period (see explanations above).
 
-    TODO: Tests
-    TODO: Implement walk-forward cross-validation.
-
     """
     def __init__(self, n_splits=10, n_test_splits=2, embargo_td=pd.Timedelta(minutes=0)):
         super().__init__(n_splits)
@@ -97,9 +272,9 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
             raise ValueError(f"The number of test folds must be of Integral type. {n_test_split} of type "
                              f"{type(n_test_splits)} was passed.")
         n_test_splits = int(n_test_splits)
-        if n_test_splits <= 0 or n_test_splits >= self.n_splits:
+        if n_test_splits <= 0 or n_test_splits >= self.n_splits - 1:
             raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
-                             f"n_test_splits between 1 and n_splits, got n_test_splits = {n_test_splits}.")
+                             f"n_test_splits between 1 and n_splits - 1, got n_test_splits = {n_test_splits}.")
         self.n_test_splits = n_test_splits
         if not isinstance(embargo_td, pd.Timedelta):
             raise ValueError(f"The embargo time should be of type Pandas Timedelta. {embargo_td} of type "
@@ -176,13 +351,10 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
         """
         # As a first approximation, the train set is the complement of the test set
         train_indices = np.setdiff1d(self.indices, test_indices)
-        # print('train_indices', train_indices)
-        # print('test_fold_bounds', test_fold_bounds)
         # But we now have to purge and embargo
         for test_fold_start, test_fold_end in test_fold_bounds:
             # Purge
             train_indices = purge(self, train_indices, test_fold_start, test_fold_end)
-            # print('array sel', test_indices[:test_indices.searchsorted(test_fold_end)])
             # Embargo
             train_indices = embargo(self, train_indices, test_indices, test_fold_end)
         return train_indices
@@ -248,10 +420,7 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
 
     """
     last_test_eval_time = cv.eval_times.iloc[test_indices[:test_fold_end]].max()
-    # print("last_test_eval_time", last_test_eval_time)
-    # print('train_indices_temp', train_indices_temp)
     min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_td])
-    #print(min_train_index)
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))
         train_indices = np.intersect1d(train_indices, allowed_indices)
