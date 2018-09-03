@@ -63,13 +63,6 @@ class TestCombPurgedKFold(TestCase):
         self.assertEqual(result1, agg_fold_bound_list)
         self.assertTrue(np.array_equal(result2, test_indices))
 
-    def test_data_equal_indices(self):
-        tm.assert_index_equal(self.X.index, self.pred_times.index)
-        tm.assert_index_equal(self.X.index, self.exit_times.index)
-
-    def test_data_pred_before_eval(self):
-        assert ((self.exit_times.subtract(self.pred_times) < pd.Timedelta('0H')).sum() == 0)
-
 
 class TestPurge(TestCase):
 
@@ -123,12 +116,12 @@ class TestEmbargo(TestCase):
         results in sample n to be embargoed.
         For the second assert statement, the window is set to 120m, causing samples n and n + 1 to be embargoed.
         """
-        cv = BaseTimeSeriesCrossValidator(n_splits=2)
+        cv = CombPurgedKFold(n_splits=2, n_test_splits=1)
         n = 6
         test_fold_end = n
 
         prepare_cv_object(cv, n_samples=2 * n, time_shift='119m', randomlize_times=False)
-        cv.embargo_dt = 0 * (cv.pred_times.max() - cv.pred_times.min())
+        cv.embargo_td = pd.Timedelta(minutes=0)
         train_indices = cv.indices[n:]
         test_indices = cv.indices[:n]
         result = cv.indices[n + 1:]
@@ -140,18 +133,25 @@ class TestEmbargo(TestCase):
 
     def test_nonzero_embargo(self):
         """
-        Same with an embargo fraction of 2/(2*n-1), corresponding to an embargo delay of 2h. two more samples have to be
-        embargoed in each case.
+        Same with an embargo delay of 2h. two more samples have to be embargoed in each case.
         """
-        cv = BaseTimeSeriesCrossValidator(n_splits=2)
+        cv = CombPurgedKFold(n_splits=2, n_test_splits=1)
         n = 6
         test_fold_end = n
 
         prepare_cv_object(cv, n_samples=2 * n, time_shift='119m', randomlize_times=False)
-        cv.embargo_dt = 2 / (2 * n - 1) * (cv.pred_times.max() - cv.pred_times.min())
+        cv.embargo_td = pd.Timedelta(minutes=120)
         train_indices = cv.indices[n:]
         test_indices = cv.indices[:n]
         result = cv.indices[n + 3:]
+
+        print(cv.embargo_td)
+        print(cv.X)
+        print(cv.pred_times)
+        print(cv.eval_times)
+        print(result)
+        print(embargo(cv, train_indices, test_indices, test_fold_end))
+
         self.assertTrue(np.array_equal(result, embargo(cv, train_indices, test_indices, test_fold_end)))
 
         prepare_cv_object(cv, n_samples=2 * n, time_shift='120m', randomlize_times=False)

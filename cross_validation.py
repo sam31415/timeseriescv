@@ -91,7 +91,7 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
     TODO: Implement walk-forward cross-validation.
 
     """
-    def __init__(self, n_splits=10, n_test_splits=2, embargo=0.0):
+    def __init__(self, n_splits=10, n_test_splits=2, embargo_td=pd.Timedelta(minutes=0)):
         super().__init__(n_splits)
         if not isinstance(n_test_splits, numbers.Integral):
             raise ValueError(f"The number of test folds must be of Integral type. {n_test_split} of type "
@@ -101,14 +101,12 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
             raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
                              f"n_test_splits between 1 and n_splits, got n_test_splits = {n_test_splits}.")
         self.n_test_splits = n_test_splits
-        if not isinstance(embargo, numbers.Real):
-            raise ValueError(f"The embargo fraction should be of Real type. {embargo} of type "
-                             f"{type(embargo)} was passed.")
-        embargo = float(embargo)
-        if embargo < 0 or embargo > 1.0:
-            raise ValueError(f"embargo should lie between 0 and 1, got embargo = {embargo}.")
-        self.embargo_frac = embargo
-        self.embargo_dt = None
+        if not isinstance(embargo_td, pd.Timedelta):
+            raise ValueError(f"The embargo time should be of type Pandas Timedelta. {embargo_td} of type "
+                             f"{type(embargo_td)} was passed.")
+        if embargo_td < pd.Timedelta(minutes=0):
+            raise ValueError(f"The embargo time should be positive, got embargo = {embargo_td}.")
+        self.embargo_td = embargo_td
 
     def split(self, X: pd.DataFrame, y: pd.Series = None,
               pred_times: pd.Series = None, eval_times: pd.Series = None) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
@@ -142,8 +140,6 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
 
         """
         super().split(X, y, pred_times, eval_times)
-
-        self.embargo_dt = self.embargo_frac*(self.pred_times.max() - self.pred_times.min())
 
         # Fold boundaries
         fold_bounds = [(fold[0], fold[-1] + 1) for fold in np.array_split(self.indices, self.n_splits)]
@@ -254,7 +250,7 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     last_test_eval_time = cv.eval_times.iloc[test_indices[:test_fold_end]].max()
     # print("last_test_eval_time", last_test_eval_time)
     # print('train_indices_temp', train_indices_temp)
-    min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_dt])
+    min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_td])
     #print(min_train_index)
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))
