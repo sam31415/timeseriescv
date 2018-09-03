@@ -254,7 +254,8 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     last_test_eval_time = cv.eval_times.iloc[test_indices[:test_fold_end]].max()
     # print("last_test_eval_time", last_test_eval_time)
     # print('train_indices_temp', train_indices_temp)
-    min_train_index = len(cv.pred_times[cv.pred_times < last_test_eval_time + cv.embargo_dt])
+    min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_dt])
+    #print(min_train_index)
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate((cv.indices[:test_fold_end], cv.indices[min_train_index:]))
         train_indices = np.intersect1d(train_indices, allowed_indices)
@@ -291,7 +292,7 @@ def purge(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
     """
     time_test_fold_start = cv.pred_times.iloc[test_fold_start]
     # The train indices before the start of the test fold, purged.
-    train_indices_1 = np.intersect1d(train_indices, cv.indices[cv.eval_times <= time_test_fold_start])
+    train_indices_1 = np.intersect1d(train_indices, cv.indices[cv.eval_times < time_test_fold_start])
     # The train indices after the end of the test fold.
     train_indices_2 = np.intersect1d(train_indices, cv.indices[test_fold_end:])
     return np.concatenate((train_indices_1, train_indices_2))
