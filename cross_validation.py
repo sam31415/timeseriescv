@@ -119,7 +119,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
             raise ValueError(f"The maximal number of train folds must be of Integral type. {max_train_splits} of type "
                              f"{type(max_train_splits)} was passed.")
         max_train_splits = int(max_train_splits)
-        if max_train_splits <= 0 or max_train_splits >= self.n_splits - self.n_test_splits:
+        if max_train_splits <= 0 or max_train_splits > self.n_splits - self.n_test_splits:
             raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
                              f"max_train_split between 1 and n_splits - n_test_splits, got max_train_split = "
                              f"{max_train_splits}.")
@@ -164,13 +164,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
         super().split(X, y, pred_times, eval_times)
 
         # Fold boundaries
-        if split_by_time:
-            full_time_span = self.pred_times.max() - self.pred_times.min()
-            fold_time_span = full_time_span / self.n_splits
-            fold_bounds_times = [fold_time_span*n for n in range(n_splits)]
-            self.fold_bounds = self.pred_times.searchsorted(fold_bounds_times)
-        else:
-            self.fold_bounds = [fold[0] for fold in np.array_split(self.indices, self.n_splits)]
+        self.fold_bounds = compute_fold_bounds(self, split_by_time)
 
         count_folds = 0
         for fold_bound in self.fold_bounds:
@@ -238,7 +232,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
         return np.arange(fold_bound, end_test)
 
 
-class CombPurgedKFold(BaseTimeSeriesCrossValidator):
+class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
     """
     Purged and embargoed combinatorial cross-validation
 
@@ -388,6 +382,25 @@ class CombPurgedKFold(BaseTimeSeriesCrossValidator):
                 test_fold_bounds[-1] = (test_fold_bounds[-1][0], fold_end)
             test_indices = np.union1d(test_indices, self.indices[fold_start:fold_end]).astype(int)
         return test_fold_bounds, test_indices
+
+
+def compute_fold_bounds(cv: BaseTimeSeriesCrossValidator, split_by_time: bool) -> Tuple[int]:
+    """
+    Compute a list containing the fold (left) boundaries.
+
+    Parameters
+    ----------
+    split_by_time: bool
+        If False, the folds contain an (approximately) equal number of samples. If True, the folds span identical
+        time intervals.
+    """
+    if split_by_time:
+        full_time_span = cv.pred_times.max() - cv.pred_times.min()
+        fold_time_span = full_time_span / cv.n_splits
+        fold_bounds_times = [cv.pred_times.iloc[0] + fold_time_span * n for n in range(cv.n_splits)]
+        return cv.pred_times.searchsorted(fold_bounds_times)
+    else:
+        return [fold[0] for fold in np.array_split(cv.indices, cv.n_splits)]
 
 
 def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,

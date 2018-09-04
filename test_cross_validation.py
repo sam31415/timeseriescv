@@ -3,17 +3,18 @@ import pandas as pd
 import pandas.util.testing as tm
 import unittest
 
-from cross_validation import CombPurgedKFold, BaseTimeSeriesCrossValidator, purge, embargo
+from cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
+                              compute_fold_bounds)
 from typing import Iterable, Tuple, List
 from unittest import TestCase
 
 
-def create_random_sample_set(n_samples, time_shift, randomize_times):
+def create_random_sample_set(n_samples, time_shift='120m', randomize_times=False, freq='60m'):
     # Create artificial data
     tm.K = 3
     tm.N = n_samples
     # Random data frame with an hourly index
-    test_df = tm.makeTimeDataFrame(freq='H')
+    test_df = tm.makeTimeDataFrame(freq=freq)
     # Turn the index into a column labeled 'index'
     test_df = test_df.reset_index()
     if randomize_times:
@@ -41,12 +42,21 @@ def prepare_cv_object(cv: BaseTimeSeriesCrossValidator, n_samples: int, time_shi
     cv.eval_times = eval_times
     cv.indices = np.arange(X.shape[0])
 
+    #if isinstance(cv, PurgedWalkForwardCV):
 
-class TestCombPurgedKFold(TestCase):
-    """
-    To test:
-    - Test doesn't intersect train
-    """
+
+
+# class TestPurgedWalkForwardCV(TestCase):
+#     def test_compute_test_set(self):
+#         """
+#
+#         """
+#         cv = PurgedWalkForwardCV(n_splits=5)
+#         prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
+#         cv.fold_bounds = compute_fold_bounds(cv, split_by_time)
+#         pass
+
+class TestCombPurgedKFoldCV(TestCase):
 
     def test_compute_test_set(self):
         """
@@ -57,11 +67,48 @@ class TestCombPurgedKFold(TestCase):
         result1 = [(2, 6), (8,10)]
         result2 = np.array([2, 3, 4, 5, 8, 9])
 
-        cv = CombPurgedKFold(n_splits=5)
+        cv = CombPurgedKFoldCV(n_splits=5)
         prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
         agg_fold_bound_list, test_indices = cv.compute_test_set(fold_bound_list)
         self.assertEqual(result1, agg_fold_bound_list)
         self.assertTrue(np.array_equal(result2, test_indices))
+
+
+class TestComputeFoldBounds(TestCase):
+    def test_by_samples(self):
+        """
+        Uses a 10 sample set, with 5 folds. The fold left bounds are at 0, 2, 4, 6, and 8.
+        """
+        cv = PurgedWalkForwardCV(n_splits=5)
+        prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
+        result = [0, 2, 4, 6, 8]
+        self.assertEqual(result, compute_fold_bounds(cv, False))
+
+    def test_by_time(self):
+        """
+        Creates a sample set consisting in 11 samples at 2h intervals, spanning 20h, as well as 10 samples at 59m
+        intervals, with the first samples of each group occurring at the same time. Inspection shows that the fold left
+        bounds are at 0, 7, 13, 16, 18.
+        """
+        cv = PurgedWalkForwardCV(n_splits=5)
+
+        X1, pred_times1, eval_times1 = create_random_sample_set(n_samples=11, freq='2H')
+        X2, pred_times2, eval_times2 = create_random_sample_set(n_samples=10, freq='59T')
+        data1 = pd.concat([X1, pred_times1, eval_times1], axis=1)
+        data2 = pd.concat([X2, pred_times2, eval_times2], axis=1)
+        data = pd.concat([data1, data2], axis=0, ignore_index=True)
+        data = data.sort_values(by=data.columns[3])
+        X = data.iloc[:, 0:3]
+        pred_times = data.iloc[:, 3]
+        eval_times = data.iloc[:, 4]
+
+        cv.X = X
+        cv.pred_times = pred_times
+        cv.eval_times = eval_times
+        cv.indices = np.arange(X.shape[0])
+
+        result = [0, 7, 13, 16, 18]
+        self.assertTrue(all(result[i] == compute_fold_bounds(cv, True)[i] for i in range(5)))
 
 
 class TestPurge(TestCase):
@@ -116,7 +163,7 @@ class TestEmbargo(TestCase):
         results in sample n to be embargoed.
         For the second assert statement, the window is set to 120m, causing samples n and n + 1 to be embargoed.
         """
-        cv = CombPurgedKFold(n_splits=2, n_test_splits=1)
+        cv = CombPurgedKFoldCV(n_splits=2, n_test_splits=1)
         n = 6
         test_fold_end = n
 
@@ -135,7 +182,7 @@ class TestEmbargo(TestCase):
         """
         Same with an embargo delay of 2h. two more samples have to be embargoed in each case.
         """
-        cv = CombPurgedKFold(n_splits=2, n_test_splits=1)
+        cv = CombPurgedKFoldCV(n_splits=2, n_test_splits=1)
         n = 6
         test_fold_end = n
 
