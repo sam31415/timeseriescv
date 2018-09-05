@@ -169,6 +169,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
         count_folds = 0
         for fold_bound in self.fold_bounds:
             if count_folds < self.min_train_splits:
+                count_folds = count_folds + 1
                 continue
             if self.n_splits - count_folds < self.n_test_splits:
                 break
@@ -177,7 +178,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
             # Computes the train set indices
             train_indices = self.compute_train_set(fold_bound, count_folds)
 
-            count_folds += 1
+            count_folds = count_folds + 1
             yield train_indices, test_indices
 
     def compute_train_set(self, fold_bound: int, count_folds: int) -> np.ndarray:
@@ -228,7 +229,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
         if self.n_splits - count_folds > self.n_test_splits:
             end_test = self.fold_bounds[count_folds + self.n_test_splits]
         else:
-            end_test = self.indices[-1]
+            end_test = self.indices[-1] + 1
         return np.arange(fold_bound, end_test)
 
 

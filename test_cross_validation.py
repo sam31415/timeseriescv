@@ -42,21 +42,114 @@ def prepare_cv_object(cv: BaseTimeSeriesCrossValidator, n_samples: int, time_shi
     cv.eval_times = eval_times
     cv.indices = np.arange(X.shape[0])
 
-    #if isinstance(cv, PurgedWalkForwardCV):
+def prepare_time_inhomogeneous_cv_object(cv: BaseTimeSeriesCrossValidator):
+    """
+    Creates a sample set consisting in 11 samples at 2h intervals, spanning 20h, as well as 10 samples at 59m intervals,
+    with the first samples of each group occurring at the same time.
+
+    pred_times and eval_times have the following values:
+                pred_times          eval_times
+    0  2000-01-01 00:00:00 2000-01-01 01:00:00
+    1  2000-01-01 00:00:00 2000-01-01 01:00:00
+    2  2000-01-01 00:59:00 2000-01-01 01:59:00
+    3  2000-01-01 01:58:00 2000-01-01 02:58:00
+    4  2000-01-01 02:00:00 2000-01-01 03:00:00
+    5  2000-01-01 02:57:00 2000-01-01 03:57:00
+    6  2000-01-01 03:56:00 2000-01-01 04:56:00
+    7  2000-01-01 04:00:00 2000-01-01 05:00:00
+    8  2000-01-01 04:55:00 2000-01-01 05:55:00
+    9  2000-01-01 05:54:00 2000-01-01 06:54:00
+    10 2000-01-01 06:00:00 2000-01-01 07:00:00
+    11 2000-01-01 06:53:00 2000-01-01 07:53:00
+    12 2000-01-01 07:52:00 2000-01-01 08:52:00
+    13 2000-01-01 08:00:00 2000-01-01 09:00:00
+    14 2000-01-01 08:51:00 2000-01-01 09:51:00
+    15 2000-01-01 10:00:00 2000-01-01 11:00:00
+    16 2000-01-01 12:00:00 2000-01-01 13:00:00
+    17 2000-01-01 14:00:00 2000-01-01 15:00:00
+    18 2000-01-01 16:00:00 2000-01-01 17:00:00
+    19 2000-01-01 18:00:00 2000-01-01 19:00:00
+    20 2000-01-01 20:00:00 2000-01-01 21:00:00
+    """
+    X1, pred_times1, eval_times1 = create_random_sample_set(n_samples=11, time_shift='1H', freq='2H')
+    X2, pred_times2, eval_times2 = create_random_sample_set(n_samples=10, time_shift='1H', freq='59T')
+    data1 = pd.concat([X1, pred_times1, eval_times1], axis=1)
+    data2 = pd.concat([X2, pred_times2, eval_times2], axis=1)
+    data = pd.concat([data1, data2], axis=0, ignore_index=True)
+    data = data.sort_values(by=data.columns[3])
+    data = data.reset_index(drop=True)
+    X = data.iloc[:, 0:3]
+    pred_times = data.iloc[:, 3]
+    eval_times = data.iloc[:, 4]
+
+    cv.X = X
+    cv.pred_times = pred_times
+    cv.eval_times = eval_times
+    cv.indices = np.arange(X.shape[0])
 
 
 
-# class TestPurgedWalkForwardCV(TestCase):
-#     def test_compute_test_set(self):
-#         """
-#
-#         """
-#         cv = PurgedWalkForwardCV(n_splits=5)
-#         prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
-#         cv.fold_bounds = compute_fold_bounds(cv, split_by_time)
-#         pass
+class TestPurgedWalkForwardCV(TestCase):
+    def test_split(self):
+        """
+        Apply split to the sample described in the docstring of prepare_time_inhomogeneous_cv_object with n_splits = 5.
+        Inspection shows that the pairs test-train sets should respectively be
+        1. Train: [0 : 12], test: [13 : 16] (Sample 12 purged from the train set.)
+        2. Train: [0 : 16], test: [16, 17]
+        3. Train: [0 : 18], test: [18 : 21]
+        """
+        cv = PurgedWalkForwardCV(n_splits=5)
+        prepare_time_inhomogeneous_cv_object(cv)
+        count = 0
+        for train_set, test_set in cv.split(cv.X, pred_times=cv.pred_times, eval_times=cv.eval_times,
+                                            split_by_time=True):
+            count += 1
+            if count == 1:
+                result_train = np.arange(12)
+                result_test = np.arange(13, 16)
+                self.assertTrue(np.array_equal(result_train, train_set))
+                self.assertTrue(np.array_equal(result_test, test_set))
+            if count == 2:
+                result_train = np.arange(16)
+                result_test = np.arange(16, 18)
+                self.assertTrue(np.array_equal(result_train, train_set))
+                self.assertTrue(np.array_equal(result_test, test_set))
+            if count == 3:
+                result_train = np.arange(18)
+                result_test = np.arange(18, 21)
+                self.assertTrue(np.array_equal(result_train, train_set))
+                self.assertTrue(np.array_equal(result_test, test_set))
+
 
 class TestCombPurgedKFoldCV(TestCase):
+
+    def test_split(self):
+        """
+        Apply split to the sample described in the docstring of prepare_time_inhomogeneous_cv_object, with n_splits = 4
+        and n_test_splits = 2. The folds are [0 : 6], [6 : 11], [11 : 16], [16 : 21]. We use an embargo of zero.
+        Inspection shows that the pairs test-train sets should respectively be
+        [...]
+        3. Train: folds 1 and 4, samples [0, 1, 2, 3, 4, 16, 17, 18, 19, 20]. Test: folds 2 and 3, samples [6, 7, 8, 9,
+         10, 11, 12, 13, 14, 15]. Sample 5 is purged from the train set.
+        4. Train: folds 2 and 3, samples [7, 8, 9, 10, 11, 12, 13, 14, 15]. Test: folds 1 and 4, samples [0, 1, 2, 3, 4,
+         5, 16, 17, 18, 19, 20]. Sample 6 is embargoed.
+        [...]
+        """
+        cv = CombPurgedKFoldCV(n_splits=4, n_test_splits=2)
+        prepare_time_inhomogeneous_cv_object(cv)
+        count = 0
+        for train_set, test_set in cv.split(cv.X, pred_times=cv.pred_times, eval_times=cv.eval_times):
+            count += 1
+            if count == 3:
+                result_train = np.array([0, 1, 2, 3, 4, 16, 17, 18, 19, 20])
+                result_test = np.array([6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+                self.assertTrue(np.array_equal(result_train, train_set))
+                self.assertTrue(np.array_equal(result_test, test_set))
+            if count == 4:
+                result_train = np.array([7, 8, 9, 10, 11, 12, 13, 14, 15])
+                result_test = np.array([0, 1, 2, 3, 4, 5, 16, 17, 18, 19, 20])
+                self.assertTrue(np.array_equal(result_train, train_set))
+                self.assertTrue(np.array_equal(result_test, test_set))
 
     def test_compute_test_set(self):
         """
@@ -77,7 +170,7 @@ class TestCombPurgedKFoldCV(TestCase):
 class TestComputeFoldBounds(TestCase):
     def test_by_samples(self):
         """
-        Uses a 10 sample set, with 5 folds. The fold left bounds are at 0, 2, 4, 6, and 8.
+        Use a 10 sample set, with 5 folds. The fold left bounds are at 0, 2, 4, 6, and 8.
         """
         cv = PurgedWalkForwardCV(n_splits=5)
         prepare_cv_object(cv, n_samples=10, time_shift='120m', randomlize_times=False)
@@ -86,27 +179,11 @@ class TestComputeFoldBounds(TestCase):
 
     def test_by_time(self):
         """
-        Creates a sample set consisting in 11 samples at 2h intervals, spanning 20h, as well as 10 samples at 59m
-        intervals, with the first samples of each group occurring at the same time. Inspection shows that the fold left
-        bounds are at 0, 7, 13, 16, 18.
+        Create a sample set as described in the docstring of prepare_time_inhomogeneous_cv_object. Inspection shows
+        that the fold left bounds are at 0, 7, 13, 16, 18.
         """
         cv = PurgedWalkForwardCV(n_splits=5)
-
-        X1, pred_times1, eval_times1 = create_random_sample_set(n_samples=11, freq='2H')
-        X2, pred_times2, eval_times2 = create_random_sample_set(n_samples=10, freq='59T')
-        data1 = pd.concat([X1, pred_times1, eval_times1], axis=1)
-        data2 = pd.concat([X2, pred_times2, eval_times2], axis=1)
-        data = pd.concat([data1, data2], axis=0, ignore_index=True)
-        data = data.sort_values(by=data.columns[3])
-        X = data.iloc[:, 0:3]
-        pred_times = data.iloc[:, 3]
-        eval_times = data.iloc[:, 4]
-
-        cv.X = X
-        cv.pred_times = pred_times
-        cv.eval_times = eval_times
-        cv.indices = np.arange(X.shape[0])
-
+        prepare_time_inhomogeneous_cv_object(cv)
         result = [0, 7, 13, 16, 18]
         self.assertTrue(all(result[i] == compute_fold_bounds(cv, True)[i] for i in range(5)))
 
@@ -115,7 +192,7 @@ class TestPurge(TestCase):
 
     def test_traintest(self):
         """
-        Generates a 2n sample data set consisting of
+        Generate a 2n sample data set consisting of
         - hourly samples
         - two folds, with a train fold followed by a test fold, starting at sample n + 1
         For the first assert statement, a fixed 119m window between the prediction and the the evaluation times. This
@@ -138,7 +215,7 @@ class TestPurge(TestCase):
 
     def test_testtrain(self):
         """
-        Generates a similar sample, but with the test set preceding the train set, which starts at n. No sample should
+        Generate a similar sample, but with the test set preceding the train set, which starts at n. No sample should
         be purged.
         """
         cv = BaseTimeSeriesCrossValidator(n_splits=2)
@@ -156,7 +233,7 @@ class TestEmbargo(TestCase):
 
     def test_zero_embargo(self):
         """
-        Generates a 2n sample data set consisting of
+        Generate a 2n sample data set consisting of
         - hourly samples
         - two folds, with a test fold followed by a train fold, starting at sample n
         For the first assert statement, a fixed 119m window between the prediction and the the evaluation times. This
