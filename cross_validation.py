@@ -2,13 +2,12 @@ import itertools as itt
 import numbers
 import numpy as np
 import pandas as pd
-import sklearn
 
 from abc import abstractmethod
-from typing import Iterable, Tuple, List, Set, Callable
+from typing import Iterable, Tuple, List
 
 
-class BaseTimeSeriesCrossValidator():
+class BaseTimeSeriesCrossValidator:
     """
     Abstract class for time series cross-validation.
 
@@ -26,7 +25,7 @@ class BaseTimeSeriesCrossValidator():
     """
     def __init__(self, n_splits=10):
         if not isinstance(n_splits, numbers.Integral):
-            raise ValueError(f"The number of folds must be of Integral type. {n_split} of type {type(n_splits)}"
+            raise ValueError(f"The number of folds must be of Integral type. {n_splits} of type {type(n_splits)}"
                              f" was passed.")
         n_splits = int(n_splits)
         if n_splits <= 1:
@@ -95,7 +94,7 @@ class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
     def __init__(self, n_splits=10, n_test_splits=1, min_train_splits=2, max_train_splits=None):
         super().__init__(n_splits)
         if not isinstance(n_test_splits, numbers.Integral):
-            raise ValueError(f"The number of test folds must be of Integral type. {n_test_split} of type "
+            raise ValueError(f"The number of test folds must be of Integral type. {n_test_splits} of type "
                              f"{type(n_test_splits)} was passed.")
         n_test_splits = int(n_test_splits)
         if n_test_splits <= 0 or n_test_splits >= self.n_splits - 1:
@@ -245,9 +244,9 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
 
     Each sample should be tagged with a prediction time pred_time and an evaluation time eval_time. The split is such
     that the intervals [pred_times, eval_times] associated to samples in the train and test set do not overlap. (The
-    overlapping samples are dropped.) In addition, an "embargo" fraction of the dataset time span is defined, giving
-    the minimal time between an evaluation time in the test set and a prediction time in the training set. This is to
-    avoid, in the presence of temporal correlation, a contamination of the test set by the train set.
+    overlapping samples are dropped.) In addition, an "embargo" period is defined, giving the minimal time between an
+    evaluation time in the test set and a prediction time in the training set. This is to avoid, in the presence of
+    temporal correlation, a contamination of the test set by the train set.
 
     Parameters
     ----------
@@ -257,17 +256,17 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
     n_test_splits : int, default=2
         Number of folds used in the test set. Must be at least 1.
 
-    embargo : float, default=0.0
-        Fraction of the sampling timespan that should be used as embargo period (see explanations above).
+    embargo_td : pd.Timedelta, default=0
+        Embargo period (see explanations above).
 
     """
     def __init__(self, n_splits=10, n_test_splits=2, embargo_td=pd.Timedelta(minutes=0)):
         super().__init__(n_splits)
         if not isinstance(n_test_splits, numbers.Integral):
-            raise ValueError(f"The number of test folds must be of Integral type. {n_test_split} of type "
+            raise ValueError(f"The number of test folds must be of Integral type. {n_test_splits} of type "
                              f"{type(n_test_splits)} was passed.")
         n_test_splits = int(n_test_splits)
-        if n_test_splits <= 0 or n_test_splits >= self.n_splits - 1:
+        if n_test_splits <= 0 or n_test_splits > self.n_splits - 1:
             raise ValueError(f"K-fold cross-validation requires at least one train/test split by setting "
                              f"n_test_splits between 1 and n_splits - 1, got n_test_splits = {n_test_splits}.")
         self.n_test_splits = n_test_splits
@@ -385,12 +384,14 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
         return test_fold_bounds, test_indices
 
 
-def compute_fold_bounds(cv: BaseTimeSeriesCrossValidator, split_by_time: bool) -> Tuple[int]:
+def compute_fold_bounds(cv: BaseTimeSeriesCrossValidator, split_by_time: bool) -> List[int]:
     """
     Compute a list containing the fold (left) boundaries.
 
     Parameters
     ----------
+    cv: BaseTimeSeriesCrossValidator
+        Cross-validation object for which the bounds need to be computed.
     split_by_time: bool
         If False, the folds contain an (approximately) equal number of samples. If True, the folds span identical
         time intervals.
@@ -433,6 +434,9 @@ def embargo(cv: BaseTimeSeriesCrossValidator, train_indices: np.ndarray,
         The same array, with the indices subject to embargo removed.
 
     """
+    if not hasattr(cv, 'embargo_td'):
+        raise ValueError("The passed cross-validation object should have a member cv.embargo_td defining the embargo"
+                         "time.")
     last_test_eval_time = cv.eval_times.iloc[test_indices[:test_fold_end]].max()
     min_train_index = len(cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_td])
     if min_train_index < cv.indices.shape[0]:

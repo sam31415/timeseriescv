@@ -3,13 +3,21 @@ import pandas as pd
 import pandas.util.testing as tm
 import unittest
 
-from cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
-                              compute_fold_bounds)
+try:
+    from cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
+                                compute_fold_bounds)
+except:
+    pass
+try:
+    from .cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
+                                compute_fold_bounds)
+except:
+    pass
 from typing import Iterable, Tuple, List
 from unittest import TestCase
 
 
-def create_random_sample_set(n_samples, time_shift='120m', randomize_times=False, freq='60m'):
+def create_random_sample_set(n_samples, time_shift='120m', randomize_times=False, freq='60T'):
     # Create artificial data
     tm.K = 3
     tm.N = n_samples
@@ -41,6 +49,7 @@ def prepare_cv_object(cv: BaseTimeSeriesCrossValidator, n_samples: int, time_shi
     cv.pred_times = pred_times
     cv.eval_times = eval_times
     cv.indices = np.arange(X.shape[0])
+
 
 def prepare_time_inhomogeneous_cv_object(cv: BaseTimeSeriesCrossValidator):
     """
@@ -86,7 +95,6 @@ def prepare_time_inhomogeneous_cv_object(cv: BaseTimeSeriesCrossValidator):
     cv.pred_times = pred_times
     cv.eval_times = eval_times
     cv.indices = np.arange(X.shape[0])
-
 
 
 class TestPurgedWalkForwardCV(TestCase):
@@ -157,7 +165,7 @@ class TestCombPurgedKFoldCV(TestCase):
         aggregated bounds [2:6], [8:10], as well as the corresponding test indices.
         """
         fold_bound_list = [(2, 4), (4, 6), (8, 10)]
-        result1 = [(2, 6), (8,10)]
+        result1 = [(2, 6), (8, 10)]
         result2 = np.array([2, 3, 4, 5, 8, 9])
 
         cv = CombPurgedKFoldCV(n_splits=5)
@@ -269,13 +277,6 @@ class TestEmbargo(TestCase):
         test_indices = cv.indices[:n]
         result = cv.indices[n + 3:]
 
-        print(cv.embargo_td)
-        print(cv.X)
-        print(cv.pred_times)
-        print(cv.eval_times)
-        print(result)
-        print(embargo(cv, train_indices, test_indices, test_fold_end))
-
         self.assertTrue(np.array_equal(result, embargo(cv, train_indices, test_indices, test_fold_end)))
 
         prepare_cv_object(cv, n_samples=2 * n, time_shift='120m', randomlize_times=False)
@@ -285,6 +286,4 @@ class TestEmbargo(TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
 
