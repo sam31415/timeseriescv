@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/scikit_extensions_sam.iml" filepath="$PROJECT_DIR$/.idea/scikit_extensions_sam.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/time_series_cross_validation.iml" filepath="$PROJECT_DIR$/.idea/time_series_cross_validation.iml" />
     </modules>
   </component>
 </project>

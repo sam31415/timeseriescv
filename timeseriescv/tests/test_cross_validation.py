@@ -4,16 +4,15 @@ import pandas.util.testing as tm
 import unittest
 
 try:
-    from cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
-                                compute_fold_bounds)
+    from timeseriescv.cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
+                                               compute_fold_bounds)
 except:
     pass
 try:
-    from .cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
-                                compute_fold_bounds)
+    from timeseriescv.cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
+                                               compute_fold_bounds)
 except:
     pass
-from typing import Iterable, Tuple, List
 from unittest import TestCase
 
 
