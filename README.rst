@@ -7,7 +7,7 @@ datasets where each sample is tagged with a prediction time and an evaluation ti
 Ressources
 ~~~~~~~~~~
 
-* `A Medium post <https://github.com/sam31415/timeseriescv/>`_  providing some motivation and explaining the cross-validation algorithms implemented here in more detail.
+* `A Medium post <https://medium.com/@samuel.monnier/cross-validation-tools-for-time-series-ffa1a5a09bf9>`_  providing some motivation and explaining the cross-validation algorithms implemented here in more detail.
 
 * `Advances in financial machine learning <https://www.wiley.com/en-us/Advances+in+Financial+Machine+Learning-p-9781119482086>`_ by Marcos Lopez de Prado. An excellent book that inspired this package.
 
