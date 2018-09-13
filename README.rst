@@ -4,7 +4,7 @@ timeseriescv
 This package implements two cross-validation algorithms suitable to evaluate machine learning models based on time series
 datasets where each sample is tagged with a prediction time and an evaluation time.
 
-Ressources
+Resources
 ~~~~~~~~~~
 
 * `A Medium post <https://medium.com/@samuel.monnier/cross-validation-tools-for-time-series-ffa1a5a09bf9>`_  providing some motivation and explaining the cross-validation algorithms implemented here in more detail.
