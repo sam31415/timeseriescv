@@ -4,7 +4,7 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-setup(name='timeseriescv_',
+setup(name='timeseriescv',
       version='0.2',
       description='Scikit-learn style cross-validation classes for time series data',
       long_description=readme(),
