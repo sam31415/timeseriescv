@@ -4,7 +4,7 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-setup(name='timeseriescv',
+setup(name='timeseriescv_',
       version='0.2',
       description='Scikit-learn style cross-validation classes for time series data',
       long_description=readme(),
@@ -15,9 +15,9 @@ setup(name='timeseriescv',
           'Topic :: Scientific/Engineering',
       ],
       keywords='machine-learning cross-validation scikit-learn time-series',
-      url='https://github.com/sam31415/timeseriescv',
-      author='Samuel Monnier',
-      author_email='samuel.monnier@gmail.com',
+      url='https://github.com/pythagorea1/timeseriescv',
+      author='Kakyo Okina',
+      author_email='kakyo@alpacadb.com',
       license='MIT',
       packages=['timeseriescv'],
       install_requires=[
