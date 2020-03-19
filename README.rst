@@ -55,7 +55,5 @@ The API is as similar to the scikit-learn API as possible. Like the scikit-learn
 method is a generator that yields a pair of numpy arrays containing the positional indices of the samples in the train
 and validation set, respectively. The main differences with the scikit-learn API are:
 
-* The ``split`` method takes as arguments not only the predictor values ``X``, but also the prediction times ``pred_times`` and the evaluation times ``eval_times`` of each sample.
-
 Check the docstrings of the cross-validation classes for more information.
 
