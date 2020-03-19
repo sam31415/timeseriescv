@@ -29,7 +29,7 @@ For now the package contains two main classes handling cross-validation:
 * ``PurgedWalkForwardCV``: Walk-forward cross-validation with purging.
 * ``CombPurgedKFoldCV``: Combinatorial cross-validation with purging and embargoing.
 
-Quick Start
+Quick Start for CPCV
 ~~~~~~~~~~~~
 
     >>> from timeseriescv.cross_validation import CombPurgedKFoldCV as CPCV
@@ -37,6 +37,14 @@ Quick Start
     >>> for (train_set, test_set) in cpcv.split(df):
     >>>     train_X = df.iloc[train_set]
     >>>     test_X = df.iloc[test_set]
+
+Quick Start for WalkForward
+~~~~~~~~~~~~
+    >>> from timeseriescv.walkforward import PurgedWalkForwardCV as WF
+    >>> wf = WF(n_splits=10, n_test_splits=2, purge_count=10)
+    >>> for (train_set, test_set) in wf.split(df):
+    >>>     train_X = df.iloc[train_set]
+    >>>     test_X = df.iloc[test_set] 
 
 
 
@@ -48,7 +56,6 @@ method is a generator that yields a pair of numpy arrays containing the position
 and validation set, respectively. The main differences with the scikit-learn API are:
 
 * The ``split`` method takes as arguments not only the predictor values ``X``, but also the prediction times ``pred_times`` and the evaluation times ``eval_times`` of each sample.
-* To stay as close to the scikit-learn API as possible, this data is passed as separate parameters. But in order to ensure that they are properly aligned, ``X``, ``pred_times`` and ``eval_times`` are required to be pandas DataFrames/Series sharing the same index.
 
 Check the docstrings of the cross-validation classes for more information.
 
