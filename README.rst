@@ -19,7 +19,7 @@ Installation
 
 timeseriescv can be installed using pip:
 
-    >>> pip install timeseriescv
+    >>> pip install git+https://github.com/pythagorea1/timeseriescv
 
 Content
 ~~~~~~~
@@ -28,6 +28,17 @@ For now the package contains two main classes handling cross-validation:
 
 * ``PurgedWalkForwardCV``: Walk-forward cross-validation with purging.
 * ``CombPurgedKFoldCV``: Combinatorial cross-validation with purging and embargoing.
+
+Quick Start
+~~~~~~~~~~~~
+
+    >>> from timeseriescv.cross_validation import CombPurgedKFoldCV as CPCV
+    >>> cpcv = CPCV(n_splits=10, n_test_splits=2)
+    >>> for (train_set, test_set) in cpcv.split(df):
+    >>>     train_X = df.iloc[train_set]
+    >>>     test_X = df.iloc[test_set]
+
+
 
 Remarks concerning the API
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
