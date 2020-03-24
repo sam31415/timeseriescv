@@ -3,7 +3,7 @@ import itertools as itt
 import pandas as pd
 import numpy as np
 from typing import Iterable, Tuple, List
-from core import BaseTimeSeriesCrossValidator, purge, embargo
+from timeseriescv.core import BaseTimeSeriesCrossValidator, purge, embargo
 
 class PurgedWalkForwardCV(BaseTimeSeriesCrossValidator):
     """
