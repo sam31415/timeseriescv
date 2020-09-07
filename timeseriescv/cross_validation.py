@@ -75,12 +75,17 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
     """
 
     def __init__(
-        self, n_splits=10, n_test_splits=2, embargo_td=pd.Timedelta(minutes=0)
+        self,
+        n_splits=10,
+        n_test_splits=2,
+        embargo_td=pd.Timedelta(minutes=0),
+        embargo_before_td=pd.Timedelta(minutes=0),
     ):
         super().__init__(n_splits)
         n_test_splits = int(n_test_splits)
         self.n_test_splits = n_test_splits
         self.embargo_td = embargo_td
+        self.embargo_before_td = embargo_before_td
 
     def split(self, X: pd.DataFrame) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
         """
@@ -153,7 +158,9 @@ class CombPurgedKFoldCV(BaseTimeSeriesCrossValidator):
             # Purge
             train_indices = purge(self, train_indices, test_fold_start, test_fold_end)
             # Embargo
-            train_indices = embargo(self, train_indices, test_indices, test_fold_end)
+            train_indices = embargo(
+                self, train_indices, test_indices, test_fold_start, test_fold_end
+            )
         return train_indices
 
     def compute_test_set(
@@ -195,6 +202,7 @@ def embargo(
     cv: BaseTimeSeriesCrossValidator,
     train_indices: np.ndarray,
     test_indices: np.ndarray,
+    test_fold_start: int,
     test_fold_end: int,
 ) -> np.ndarray:
     """
@@ -231,12 +239,16 @@ def embargo(
             "time."
         )
     last_test_eval_time = cv.eval_times.iloc[test_indices[:test_fold_end]].max()
+    first_test_eval_time = cv.eval_times.iloc[test_indices[test_fold_start:]].min()
     min_train_index = len(
         cv.pred_times[cv.pred_times <= last_test_eval_time + cv.embargo_td]
     )
+    max_train_index = len(
+        cv.pred_times[cv.pred_times >= first_test_eval_time - cv.embargo_before_td]
+    )
     if min_train_index < cv.indices.shape[0]:
         allowed_indices = np.concatenate(
-            (cv.indices[:test_fold_end], cv.indices[min_train_index:])
+            (cv.indices[:max_train_index], cv.indices[min_train_index:])
         )
         train_indices = np.intersect1d(train_indices, allowed_indices)
     return train_indices
