@@ -8,11 +8,7 @@ try:
                                                compute_fold_bounds)
 except:
     pass
-try:
-    from timeseriescv.cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
-                                               compute_fold_bounds)
-except:
-    pass
+
 from unittest import TestCase
 
 
