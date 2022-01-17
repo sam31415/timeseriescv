@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import pandas.util.testing as tm
+import pandas._testing as tm
 import unittest
 
 try:
@@ -8,11 +8,7 @@ try:
                                                compute_fold_bounds)
 except:
     pass
-try:
-    from timeseriescv.cross_validation import (BaseTimeSeriesCrossValidator, PurgedWalkForwardCV, CombPurgedKFoldCV, purge, embargo,
-                                               compute_fold_bounds)
-except:
-    pass
+
 from unittest import TestCase
 
 
