@@ -54,6 +54,11 @@ class BaseTimeSeriesCrossValidator:
         if (X.index == eval_times.index).sum() != len(eval_times):
             raise ValueError('X and eval_times must have the same index')
 
+        if not pred_times.equals(pred_times.sort_values()):
+            raise ValueError('pred_times should be sorted')
+        if not eval_times.equals(eval_times.sort_values()):
+            raise ValueError('eval_times should be sorted')
+
         self.pred_times = pred_times
         self.eval_times = eval_times
         self.indices = np.arange(X.shape[0])
